@@ -173,6 +173,8 @@ public:
         String folder; /**< The name of this folder in the tree */
         OwnedArray<PluginTree> subFolders;
         Array<PluginDescription> plugins;
+        bool selected { false };
+        PluginTree* parent {};
     };
 
     /** Creates a PluginTree object representing the list of plug-ins. */
@@ -221,7 +223,7 @@ public:
 
     // These methods have been deprecated in favour of their static counterparts. You should call getTypes()
     // to store the plug-in list at a point in time and use it when calling these methods.
-    JUCE_DEPRECATED (void addToMenu (PopupMenu& menu, SortMethod sortMethod, const String& currentlyTickedPluginID = {}) const);
+    JUCE_DEPRECATED (void addToMenu (PopupMenu& menu, SortMethod sortMethod, StringArray disabledPluginIDs = {}, const String& currentlyTickedPluginID = {}, int indexOffset=0) const);
     JUCE_DEPRECATED (int getIndexChosenByMenu (int menuResultCode) const);
     JUCE_DEPRECATED (std::unique_ptr<PluginTree> createTree (const SortMethod sortMethod) const);
 

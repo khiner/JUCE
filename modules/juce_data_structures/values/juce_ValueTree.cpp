@@ -118,6 +118,18 @@ public:
         callListenersForAllParents (nullptr, [=, &tree] (Listener& l) { l.valueTreeChildOrderChanged (tree, oldIndex, newIndex); });
     }
 
+    void sendChildWillBeMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex)
+    {
+        ValueTree tree (this);
+        callListenersForAllParents (nullptr, [=, &tree] (Listener& l) { l.valueTreeChildWillBeMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
+    }
+
+    void sendChildHasMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex)
+    {
+        ValueTree tree (this);
+        callListenersForAllParents (nullptr, [=, &tree] (Listener& l) { l.valueTreeChildHasMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
+    }
+
     void sendParentChangeMessage()
     {
         ValueTree tree (*this);
@@ -314,8 +326,7 @@ public:
         // The source index must be a valid index!
         jassert (isPositiveAndBelow (currentIndex, children.size()));
 
-        if (currentIndex != newIndex
-             && isPositiveAndBelow (currentIndex, children.size()))
+        if (currentIndex != newIndex)
         {
             if (undoManager == nullptr)
             {
@@ -332,6 +343,30 @@ public:
         }
     }
 
+    void moveChildFromParent (SharedObject *currentParentObject, int currentIndex, int insertIndex, UndoManager* undoManager) {
+        jassert(currentParentObject != nullptr);
+
+        if (currentParentObject == this)
+        {
+            if (currentIndex < insertIndex) {
+                --insertIndex;
+            }
+            return moveChild(currentIndex, insertIndex, undoManager);
+        }
+        if (Ptr child = currentParentObject->children.getObjectPointer (currentIndex)) {
+            if (undoManager == nullptr) {
+                const ValueTree &oldParent = ValueTree (currentParentObject);
+                const ValueTree &newParent = ValueTree (this);
+                sendChildWillBeMovedToNewParent(ValueTree (child), oldParent, currentIndex, newParent, insertIndex);
+                currentParentObject->removeChild(currentIndex, nullptr);
+                addChild(child, insertIndex, nullptr);
+                sendChildHasMovedToNewParent(ValueTree (child), oldParent, currentIndex, newParent, insertIndex);
+            } else {
+                undoManager->perform(new MoveChildToNewParentAction(currentParentObject, currentIndex, this, insertIndex));
+            }
+        }
+    }
+    
     void reorderChildren (const OwnedArray<ValueTree>& newOrder, UndoManager* undoManager)
     {
         jassert (newOrder.size() == children.size());
@@ -564,6 +599,46 @@ public:
         JUCE_DECLARE_NON_COPYABLE (MoveChildAction)
     };
 
+    //==============================================================================
+    struct MoveChildToNewParentAction  : public UndoableAction
+    {
+        MoveChildToNewParentAction (SharedObject* oldParentObject, int fromIndex, SharedObject* newParentObject, int toIndex) noexcept
+                : oldParent (oldParentObject), newParent (newParentObject), startIndex (fromIndex), endIndex (toIndex)
+        {
+        }
+
+        bool perform() override
+        {
+            newParent->moveChildFromParent (oldParent, startIndex, endIndex, nullptr);
+            return true;
+        }
+
+        bool undo() override
+        {
+            oldParent->moveChildFromParent (newParent, endIndex, startIndex, nullptr);
+            return true;
+        }
+
+        int getSizeInUnits() override
+        {
+            return (int) sizeof (*this); //xxx should be more accurate
+        }
+
+        UndoableAction* createCoalescedAction (UndoableAction* nextAction) override
+        {
+            if (auto* next = dynamic_cast<MoveChildToNewParentAction*> (nextAction))
+                if (next->oldParent == newParent && next->startIndex == endIndex)
+                    return new MoveChildToNewParentAction (oldParent, startIndex, next->newParent, next->endIndex);
+
+            return nullptr;
+        }
+
+    private:
+        const Ptr oldParent, newParent;
+        const int startIndex, endIndex;
+
+        JUCE_DECLARE_NON_COPYABLE (MoveChildToNewParentAction)
+    };
     //==============================================================================
     const Identifier type;
     NamedValueSet properties;
@@ -944,6 +1019,11 @@ void ValueTree::moveChild (int currentIndex, int newIndex, UndoManager* undoMana
 {
     if (object != nullptr)
         object->moveChild (currentIndex, newIndex, undoManager);
+}
+
+void ValueTree::moveChildFromParent (ValueTree currentParent, int currentIndex, int insertIndex, UndoManager* undoManager) {
+    if (object != nullptr)
+        object->moveChildFromParent(currentParent.object, currentIndex, insertIndex, undoManager);
 }
 
 //==============================================================================

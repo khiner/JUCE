@@ -363,6 +363,8 @@ public:
     */
     void moveChild (int currentIndex, int newIndex, UndoManager* undoManager);
 
+    void moveChildFromParent (ValueTree currentParent, int currentIndex, int insertIndex, UndoManager* undoManager);
+
     /** Returns true if this tree is a sub-tree (at any depth) of the given parent.
         This searches recursively, so returns true if it's a sub-tree at any level below the parent.
     */
@@ -519,6 +521,10 @@ public:
         */
         virtual void valueTreeChildOrderChanged (ValueTree& parentTreeWhoseChildrenHaveMoved,
                                                  int oldIndex, int newIndex);
+
+        virtual void valueTreeChildWillBeMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex) {};
+
+        virtual void valueTreeChildHasMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex) {};
 
         /** This method is called when a tree has been added or removed from a parent.
 

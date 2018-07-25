@@ -128,12 +128,6 @@ public:
         /** A convenient typedef for referring to a pointer to a node object. */
         using Ptr = ReferenceCountedObjectPtr<Node>;
 
-    private:
-        //==============================================================================
-        friend class AudioProcessorGraph;
-        template <typename Float>
-        friend struct GraphRenderSequence;
-
         struct Connection
         {
             Node* otherNode;
@@ -141,9 +135,16 @@ public:
 
             bool operator== (const Connection&) const noexcept;
         };
+        Array<Connection> inputs, outputs;
+
+    private:
+        //==============================================================================
+        friend class AudioProcessorGraph;
+        template <typename Float>
+        friend struct GraphRenderSequence;
 
         std::unique_ptr<AudioProcessor> processor;
-        Array<Connection> inputs, outputs;
+
         bool isPrepared = false;
         std::atomic<bool> bypassed { false };
 
@@ -238,7 +239,7 @@ public:
     /** Deletes a node within the graph which has the specified ID.
         This will also delete any connections that are attached to this node.
     */
-    Node::Ptr removeNode (NodeID);
+    virtual Node::Ptr removeNode (NodeID);
 
     /** Deletes a node within the graph.
         This will also delete any connections that are attached to this node.
@@ -269,13 +270,13 @@ public:
         If this isn't allowed (e.g. because you're trying to connect a midi channel
         to an audio one or other such nonsense), then it'll return false.
     */
-    bool addConnection (const Connection&);
+    virtual bool addConnection (const Connection&);
 
     /** Deletes the given connection. */
-    bool removeConnection (const Connection&);
+    virtual bool removeConnection (const Connection&);
 
     /** Removes all connections from the specified node. */
-    bool disconnectNode (NodeID);
+    virtual bool disconnectNode (NodeID);
 
     /** Returns true if the given connection's channel numbers map on to valid
         channels at each end.
@@ -402,9 +403,12 @@ public:
     void getStateInformation (juce::MemoryBlock&) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-private:
+protected:
     //==============================================================================
     ReferenceCountedArray<Node> nodes;
+    void topologyChanged();
+
+private:
     NodeID lastNodeID = {};
 
     struct RenderSequenceFloat;
@@ -416,7 +420,6 @@ private:
 
     std::atomic<bool> isPrepared { false };
 
-    void topologyChanged();
     void handleAsyncUpdate() override;
     void clearRenderingSequence();
     void buildRenderingSequence();
