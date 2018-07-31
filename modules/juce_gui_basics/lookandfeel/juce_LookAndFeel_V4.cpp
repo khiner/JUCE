@@ -318,6 +318,22 @@ void LookAndFeel_V4::drawButtonBackground (Graphics& g,
         g.setColour (button.findColour (ComboBox::outlineColourId));
         g.strokePath (path, PathStrokeType (1.0f));
     }
+    else if (button.isConnectedOnTop() || button.isConnectedOnBottom())
+    {
+        Path path;
+        path.addRoundedRectangle (bounds.getX(), bounds.getY(),
+                                  bounds.getWidth(), bounds.getHeight(),
+                                  cornerSize, cornerSize,
+                                  ! button.isConnectedOnTop(),
+                                  ! button.isConnectedOnTop(),
+                                  ! button.isConnectedOnBottom(),
+                                  ! button.isConnectedOnBottom());
+
+        g.fillPath (path);
+
+        g.setColour (button.findColour (ComboBox::outlineColourId));
+        g.strokePath (path, PathStrokeType (1.0f));
+    }
     else
     {
         g.fillRoundedRectangle (bounds, cornerSize);
