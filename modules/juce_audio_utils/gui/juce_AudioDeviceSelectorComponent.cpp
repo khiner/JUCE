@@ -184,6 +184,116 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiInputSelectorComponentListBox)
 };
 
+    class AudioDeviceSelectorComponent::MidiOutputSelectorComponentListBox  : public ListBox,
+                                                                             private ListBoxModel
+    {
+    public:
+        MidiOutputSelectorComponentListBox (AudioDeviceManager& dm, const String& noItems)
+                : ListBox ({}, nullptr),
+                  deviceManager (dm),
+                  noItemsMessage (noItems)
+        {
+            updateDevices();
+            setModel (this);
+            setOutlineThickness (1);
+        }
+
+        void updateDevices()
+        {
+            items = MidiOutput::getAvailableDevices();
+        }
+
+        int getNumRows() override
+        {
+            return items.size();
+        }
+
+        void paintListBoxItem (int row, Graphics& g, int width, int height, bool rowIsSelected) override
+        {
+            if (isPositiveAndBelow (row, items.size()))
+            {
+                if (rowIsSelected)
+                    g.fillAll (findColour (TextEditor::highlightColourId)
+                                       .withMultipliedAlpha (0.3f));
+
+                auto item = items[row];
+                bool enabled = deviceManager.isMidiOutputDeviceEnabled (item.identifier);
+
+                auto x = getTickX();
+                auto tickW = height * 0.75f;
+
+                getLookAndFeel().drawTickBox (g, *this, x - tickW, (height - tickW) / 2, tickW, tickW,
+                                              enabled, true, true, false);
+
+                g.setFont (height * 0.6f);
+                g.setColour (findColour (ListBox::textColourId, true).withMultipliedAlpha (enabled ? 1.0f : 0.6f));
+                g.drawText (item.name, x + 5, 0, width - x - 5, height, Justification::centredLeft, true);
+            }
+        }
+
+        void listBoxItemClicked (int row, const MouseEvent& e) override
+        {
+            selectRow (row);
+
+            if (e.x < getTickX())
+                flipEnablement (row);
+        }
+
+        void listBoxItemDoubleClicked (int row, const MouseEvent&) override
+        {
+            flipEnablement (row);
+        }
+
+        void returnKeyPressed (int row) override
+        {
+            flipEnablement (row);
+        }
+
+        void paint (Graphics& g) override
+        {
+            ListBox::paint (g);
+
+            if (items.isEmpty())
+            {
+                g.setColour (Colours::grey);
+                g.setFont (13.0f);
+                g.drawText (noItemsMessage,
+                            0, 0, getWidth(), getHeight() / 2,
+                            Justification::centred, true);
+            }
+        }
+
+        int getBestHeight (int preferredHeight)
+        {
+            auto extra = getOutlineThickness() * 2;
+
+            return jmax (getRowHeight() * 2 + extra,
+                         jmin (getRowHeight() * getNumRows() + extra,
+                               preferredHeight));
+        }
+
+    private:
+        //==============================================================================
+        AudioDeviceManager& deviceManager;
+        const String noItemsMessage;
+        Array<MidiDeviceInfo> items;
+
+        void flipEnablement (const int row)
+        {
+            if (isPositiveAndBelow (row, items.size()))
+            {
+                auto identifier = items[row].identifier;
+                deviceManager.setMidiOutputDeviceEnabled (identifier, ! deviceManager.isMidiOutputDeviceEnabled (identifier));
+            }
+        }
+
+        int getTickX() const
+        {
+            return getRowHeight();
+        }
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiOutputSelectorComponentListBox)
+    };
 
 //==============================================================================
 struct AudioDeviceSetupDetails
@@ -965,7 +1075,7 @@ AudioDeviceSelectorComponent::AudioDeviceSelectorComponent (AudioDeviceManager& 
                                                             int minOutputChannelsToUse,
                                                             int maxOutputChannelsToUse,
                                                             bool showMidiInputOptions,
-                                                            bool showMidiOutputSelector,
+                                                            bool showMidiOutputOptions,
                                                             bool showChannelsAsStereoPairsToUse,
                                                             bool hideAdvancedOptionsWithButtonToUse)
     : deviceManager (dm),
@@ -1021,19 +1131,29 @@ AudioDeviceSelectorComponent::AudioDeviceSelectorComponent (AudioDeviceManager& 
         bluetoothButton.reset();
     }
 
-    if (showMidiOutputSelector)
+    if (showMidiOutputOptions)
     {
-        midiOutputSelector.reset (new ComboBox());
-        addAndMakeVisible (midiOutputSelector.get());
-        midiOutputSelector->onChange = [this] { updateMidiOutput(); };
+        midiOutputsList.reset (new MidiOutputSelectorComponentListBox (deviceManager,
+                                                                      "(" + TRANS("No MIDI outputs available") + ")"));
+        addAndMakeVisible(midiOutputsList.get());
 
-        midiOutputLabel.reset (new Label ("lm", TRANS("MIDI Output:")));
-        midiOutputLabel->attachToComponent (midiOutputSelector.get(), true);
+        midiOutputsLabel.reset (new Label ({}, TRANS("Active MIDI outputs:")));
+        midiOutputsLabel->setJustificationType (Justification::topRight);
+        midiOutputsLabel->attachToComponent (midiOutputsList.get(), true);
+
+//        midiOutputSelector.reset (new ComboBox());
+//        addAndMakeVisible (midiOutputSelector.get());
+//        midiOutputSelector->onChange = [this] { updateMidiOutput(); };
+
+//        defaultMidiOutputLabel.reset (new Label ("lm", TRANS("Default MIDI Output:")));
+//        defaultMidiOutputLabel->attachToComponent (midiOutputSelector.get(), true);
     }
     else
     {
+        midiOutputsList.reset();
+        defaultMidiOutputLabel.reset();
         midiOutputSelector.reset();
-        midiOutputLabel.reset();
+        midiOutputsLabel.reset();
     }
 
     deviceManager.addChangeListener (this);
@@ -1074,19 +1194,26 @@ void AudioDeviceSelectorComponent::resized()
     if (midiInputsList != nullptr)
     {
         midiInputsList->setRowHeight (jmin (22, itemHeight));
-        midiInputsList->setBounds (r.removeFromTop (midiInputsList->getBestHeight (jmin (itemHeight * 8,
+        midiInputsList->setBounds (r.removeFromTop (midiInputsList->getBestHeight (jmin (itemHeight * 4,
                                                                                          getHeight() - r.getY() - space - itemHeight))));
         r.removeFromTop (space);
     }
+
+    if (midiOutputsList != nullptr)
+    {
+        midiOutputsList->setBounds (r.removeFromTop (midiOutputsList->getBestHeight (jmin (itemHeight * 4,
+                                                                                         getHeight() - r.getY() - space - itemHeight))));
+        r.removeFromTop (space);
+    }
+
+    if (midiOutputSelector != nullptr)
+        midiOutputSelector->setBounds (r.removeFromTop (itemHeight));
 
     if (bluetoothButton != nullptr)
     {
         bluetoothButton->setBounds (r.removeFromTop (24));
         r.removeFromTop (space);
     }
-
-    if (midiOutputSelector != nullptr)
-        midiOutputSelector->setBounds (r.removeFromTop (itemHeight));
 
     r.removeFromTop (itemHeight);
     setSize (getWidth(), r.getY());
@@ -1163,6 +1290,13 @@ void AudioDeviceSelectorComponent::updateAllControls()
         midiInputsList->repaint();
     }
 
+    if (midiOutputsList != nullptr)
+    {
+        midiOutputsList->updateDevices();
+        midiOutputsList->updateContent();
+        midiOutputsList->repaint();
+    }
+
     if (midiOutputSelector != nullptr)
     {
         midiOutputSelector->clear();
@@ -1202,5 +1336,10 @@ ListBox* AudioDeviceSelectorComponent::getMidiInputSelectorListBox() const noexc
 {
     return midiInputsList.get();
 }
+
+    ListBox* AudioDeviceSelectorComponent::getMidiOutputSelectorListBox() const noexcept
+    {
+        return midiOutputsList.get();
+    }
 
 } // namespace juce

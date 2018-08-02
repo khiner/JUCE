@@ -55,7 +55,7 @@ public:
         @param minAudioOutputChannels   the minimum number of audio output channels that the application needs
         @param maxAudioOutputChannels   the maximum number of audio output channels that the application needs
         @param showMidiInputOptions     if true, the component will allow the user to select which midi inputs are enabled
-        @param showMidiOutputSelector   if true, the component will let the user choose a default midi output device
+        @param showMidiOutputOptions   if true, the component will let the user choose a default midi output device
         @param showChannelsAsStereoPairs    if true, channels will be treated as pairs; if false, channels will be
                                         treated as a set of separate mono channels.
         @param hideAdvancedOptionsWithButton    if true, only the minimum amount of UI components
@@ -67,7 +67,7 @@ public:
                                   int minAudioOutputChannels,
                                   int maxAudioOutputChannels,
                                   bool showMidiInputOptions,
-                                  bool showMidiOutputSelector,
+                                  bool showMidiOutputOptions,
                                   bool showChannelsAsStereoPairs,
                                   bool hideAdvancedOptionsWithButton);
 
@@ -85,6 +85,9 @@ public:
 
     /** Returns the ListBox that's being used to show the midi inputs, or nullptr if there isn't one. */
     ListBox* getMidiInputSelectorListBox() const noexcept;
+
+    /** Returns the ListBox that's being used to show the midi outputs, or nullptr if there isn't one. */
+    ListBox* getMidiOutputSelectorListBox() const noexcept;
 
     //==============================================================================
     /** @internal */
@@ -110,10 +113,13 @@ private:
     const bool hideAdvancedOptionsWithButton;
 
     class MidiInputSelectorComponentListBox;
+    class MidiOutputSelectorComponentListBox;
+    friend struct ContainerDeletePolicy<MidiInputSelectorComponentListBox>;
     Array<MidiDeviceInfo> currentMidiOutputs;
     std::unique_ptr<MidiInputSelectorComponentListBox> midiInputsList;
+    std::unique_ptr<MidiOutputSelectorComponentListBox> midiOutputsList;
     std::unique_ptr<ComboBox> midiOutputSelector;
-    std::unique_ptr<Label> midiInputsLabel, midiOutputLabel;
+    std::unique_ptr<Label> midiInputsLabel, midiOutputsLabel, defaultMidiOutputLabel;
     std::unique_ptr<TextButton> bluetoothButton;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioDeviceSelectorComponent)

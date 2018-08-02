@@ -332,6 +332,13 @@ public:
     */
     bool isMidiInputDeviceEnabled (const String& deviceIdentifier) const;
 
+    void setMidiOutputDeviceEnabled (const String& midiOutputDeviceName, bool enabled);
+
+    bool isMidiOutputDeviceEnabled (const String& midiOutputDeviceName) const;
+
+    /** Check if any previously enabled MIDI ins/outs that were disconnected are now connected and update enablement. */
+    void updateEnabledMidiInputsAndOutputs();
+
     /** Registers a listener for callbacks when midi events arrive from a midi input.
 
         The device identifier can be empty to indicate that it wants to receive all incoming
@@ -377,9 +384,18 @@ public:
     */
     MidiOutput* getDefaultMidiOutput() const noexcept               { return defaultMidiOutput.get(); }
 
-    //==============================================================================
     /** Returns a list of the types of device supported. */
     const OwnedArray<AudioIODeviceType>& getAvailableDeviceTypes();
+
+    MidiOutput* getEnabledMidiOutput(const String& deviceName) const noexcept {
+        for (auto &midiOutput : enabledMidiOutputs) {
+            if (midiOutput->getName() == deviceName)
+                return midiOutput.get();
+        }
+        return nullptr;
+    }
+
+    //==============================================================================
 
     /** Creates a list of available types.
 
@@ -468,8 +484,10 @@ public:
     //==============================================================================
     /** Deprecated. */
     void setMidiInputEnabled (const String&, bool);
+    void setMidiOutputEnabled (const String&, bool);
     /** Deprecated. */
     bool isMidiInputEnabled (const String&) const;
+    bool isMidiOutputEnabled (const String&) const;
     /** Deprecated. */
     void addMidiInputCallback (const String&, MidiInputCallback*);
     /** Deprecated. */
@@ -499,9 +517,11 @@ private:
         MidiInputCallback* callback;
     };
 
-    Array<MidiDeviceInfo> midiDeviceInfosFromXml;
-    std::vector<std::unique_ptr<MidiInput>> enabledMidiInputs;
+    Array<MidiDeviceInfo> midiDeviceInputInfosFromXml;
+    Array<MidiDeviceInfo> midiDeviceOutputInfosFromXml;
     Array<MidiCallbackInfo> midiCallbacks;
+    std::vector<std::unique_ptr<MidiInput>> enabledMidiInputs;
+    std::vector<std::unique_ptr<MidiOutput>> enabledMidiOutputs;
 
     MidiDeviceInfo defaultMidiOutputDeviceInfo;
     std::unique_ptr<MidiOutput> defaultMidiOutput;

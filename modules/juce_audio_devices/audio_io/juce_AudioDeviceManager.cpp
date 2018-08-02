@@ -335,12 +335,25 @@ String AudioDeviceManager::initialiseFromXML (const XmlElement& xml,
     if (error.isNotEmpty() && selectDefaultDeviceOnFailure)
         error = initialise (numInputChansNeeded, numOutputChansNeeded, nullptr, false, preferredDefaultDeviceName);
 
-    midiDeviceInfosFromXml.clear();
+    midiDeviceInputInfosFromXml.clear();
     enabledMidiInputs.clear();
+    midiDeviceOutputInfosFromXml.clear();
+    enabledMidiOutputs.clear();
 
     forEachXmlChildElementWithTagName (xml, c, "MIDIINPUT")
-        midiDeviceInfosFromXml.add ({ c->getStringAttribute ("name"), c->getStringAttribute ("identifier") });
+        midiDeviceInputInfosFromXml.add ({c->getStringAttribute ("name"), c->getStringAttribute ("identifier") });
 
+    forEachXmlChildElementWithTagName (xml, c, "MIDIOUTPUT")
+        midiDeviceOutputInfosFromXml.add ({c->getStringAttribute ("name"), c->getStringAttribute ("identifier") });
+
+    updateEnabledMidiInputsAndOutputs();
+    updateXml();
+
+    return error;
+}
+
+void AudioDeviceManager::updateEnabledMidiInputsAndOutputs()
+{
     auto isIdentifierAvailable = [] (const Array<MidiDeviceInfo>& available, const String& identifier)
     {
         for (auto& device : available)
@@ -360,8 +373,7 @@ String AudioDeviceManager::initialiseFromXML (const XmlElement& xml,
     };
 
     auto inputs = MidiInput::getAvailableDevices();
-
-    for (auto& info : midiDeviceInfosFromXml)
+    for (auto& info : midiDeviceInputInfosFromXml)
     {
         if (isIdentifierAvailable (inputs, info.identifier))
         {
@@ -376,24 +388,36 @@ String AudioDeviceManager::initialiseFromXML (const XmlElement& xml,
         }
     }
 
-    MidiDeviceInfo defaultOutputDeviceInfo (xml.getStringAttribute ("defaultMidiOutput"),
-                                            xml.getStringAttribute ("defaultMidiOutputDevice"));
-
     auto outputs = MidiOutput::getAvailableDevices();
-
-    if (isIdentifierAvailable (outputs, defaultOutputDeviceInfo.identifier))
+    for (auto& info : midiDeviceOutputInfosFromXml)
     {
-        setDefaultMidiOutputDevice (defaultOutputDeviceInfo.identifier);
-    }
-    else
-    {
-        auto identifier = getUpdatedIdentifierForName (outputs, defaultOutputDeviceInfo.name);
+        if (isIdentifierAvailable (outputs, info.identifier))
+        {
+            setMidiOutputDeviceEnabled (info.identifier, true);
+        }
+        else
+        {
+            auto identifier = getUpdatedIdentifierForName (inputs, info.name);
 
-        if (identifier.isNotEmpty())
-            setDefaultMidiOutputDevice (identifier);
+            if (identifier.isNotEmpty())
+                setMidiOutputDeviceEnabled (identifier, true);
+        }
     }
 
-    return error;
+    if (lastExplicitSettings != nullptr) {
+        MidiDeviceInfo defaultOutputDeviceInfo(lastExplicitSettings->getStringAttribute ("defaultMidiOutput"),
+                                               lastExplicitSettings->getStringAttribute ("defaultMidiOutputDevice"));
+        if (isIdentifierAvailable (outputs, defaultOutputDeviceInfo.identifier))
+        {
+            setDefaultMidiOutputDevice (defaultOutputDeviceInfo.identifier);
+        }
+        else
+        {
+            auto identifier = getUpdatedIdentifierForName (outputs, defaultOutputDeviceInfo.name);
+            if (identifier.isNotEmpty())
+                setDefaultMidiOutputDevice (identifier);
+        }
+    }
 }
 
 String AudioDeviceManager::initialiseWithDefaultDevices (int numInputChannelsNeeded,
@@ -743,13 +767,13 @@ void AudioDeviceManager::updateXml()
         child->setAttribute ("identifier", input->getIdentifier());
     }
 
-    if (midiDeviceInfosFromXml.size() > 0)
+    if (midiDeviceInputInfosFromXml.size() > 0)
     {
         // Add any midi devices that have been enabled before, but which aren't currently
         // open because the device has been disconnected.
         auto availableMidiDevices = MidiInput::getAvailableDevices();
 
-        for (auto& d : midiDeviceInfosFromXml)
+        for (auto& d : midiDeviceInputInfosFromXml)
         {
             if (! availableMidiDevices.contains (d))
             {
@@ -761,10 +785,35 @@ void AudioDeviceManager::updateXml()
         }
     }
 
-    if (defaultMidiOutputDeviceInfo != MidiDeviceInfo())
+    for (auto& output : enabledMidiOutputs)
     {
-        lastExplicitSettings->setAttribute ("defaultMidiOutput",       defaultMidiOutputDeviceInfo.name);
-        lastExplicitSettings->setAttribute ("defaultMidiOutputDevice", defaultMidiOutputDeviceInfo.identifier);
+        auto* child = lastExplicitSettings->createNewChildElement ("MIDIOUTPUT");
+
+        child->setAttribute ("name",       output->getName());
+        child->setAttribute ("identifier", output->getIdentifier());
+    }
+
+    if (midiDeviceOutputInfosFromXml.size() > 0)
+    {
+        // Add any midi devices that have been enabled before, but which aren't currently
+        // open because the device has been disconnected.
+        auto availableMidiDevices = MidiOutput::getAvailableDevices();
+
+        for (auto& d : midiDeviceOutputInfosFromXml)
+        {
+            if (! availableMidiDevices.contains (d))
+            {
+                auto* child = lastExplicitSettings->createNewChildElement ("MIDIOUTPUT");
+
+                child->setAttribute ("name",       d.name);
+                child->setAttribute ("identifier", d.identifier);
+            }
+        }
+    }
+
+    if (defaultMidiOutputDeviceInfo != MidiDeviceInfo()) {
+        lastExplicitSettings->setAttribute("defaultMidiOutput", defaultMidiOutputDeviceInfo.name);
+        lastExplicitSettings->setAttribute("defaultMidiOutputDevice", defaultMidiOutputDeviceInfo.identifier);
     }
 }
 
@@ -913,12 +962,15 @@ void AudioDeviceManager::setMidiInputDeviceEnabled (const String& identifier, bo
                 enabledMidiInputs.push_back (std::move (midiIn));
                 enabledMidiInputs.back()->start();
             }
+            // XML is updated in the enablement case in `updateXml` below
         }
         else
         {
             auto removePredicate = [identifier] (const std::unique_ptr<MidiInput>& in) { return in->getIdentifier() == identifier; };
             enabledMidiInputs.erase (std::remove_if (std::begin (enabledMidiInputs), std::end (enabledMidiInputs), removePredicate),
                                      std::end (enabledMidiInputs));
+            auto removeXmlPredicate = [identifier] (const MidiDeviceInfo& in) { return in.identifier == identifier; };
+            midiDeviceInputInfosFromXml.removeIf (removeXmlPredicate);
         }
 
         updateXml();
@@ -935,7 +987,41 @@ bool AudioDeviceManager::isMidiInputDeviceEnabled (const String& identifier) con
     return false;
 }
 
-void AudioDeviceManager::addMidiInputDeviceCallback (const String& identifier, MidiInputCallback* callbackToAdd)
+void AudioDeviceManager::setMidiOutputDeviceEnabled (const String& identifier, bool enabled)
+{
+    if (enabled != isMidiOutputDeviceEnabled (identifier))
+    {
+        if (enabled)
+        {
+            if (auto midiOut = MidiOutput::openDevice (identifier)) {
+                enabledMidiOutputs.push_back (std::move (midiOut));
+            }
+            // XML is updated in the enablement case in `updateXml` below
+        }
+        else
+        {
+            auto removePredicate = [identifier] (const std::unique_ptr<MidiOutput>& in) { return in->getIdentifier() == identifier; };
+            enabledMidiOutputs.erase (std::remove_if (std::begin (enabledMidiOutputs), std::end (enabledMidiOutputs), removePredicate),
+                                     std::end (enabledMidiOutputs));
+            auto removeXmlPredicate = [identifier] (const MidiDeviceInfo& in) { return in.identifier == identifier; };
+            midiDeviceOutputInfosFromXml.removeIf (removeXmlPredicate);
+        }
+
+        updateXml();
+        sendChangeMessage();
+    }
+}
+
+bool AudioDeviceManager::isMidiOutputDeviceEnabled (const String& identifier) const
+{
+    for (auto& mi : enabledMidiOutputs)
+        if (mi->getIdentifier() == identifier)
+            return true;
+
+    return false;
+}
+
+    void AudioDeviceManager::addMidiInputDeviceCallback (const String& identifier, MidiInputCallback* callbackToAdd)
 {
     removeMidiInputDeviceCallback (identifier, callbackToAdd);
 
@@ -1115,11 +1201,32 @@ void AudioDeviceManager::setMidiInputEnabled (const String& name, const bool ena
     }
 }
 
+void AudioDeviceManager::setMidiOutputEnabled (const String& name, const bool enabled)
+{
+    for (auto& device : MidiOutput::getAvailableDevices())
+    {
+        if (device.name == name)
+        {
+            setMidiOutputDeviceEnabled (device.identifier, enabled);
+            return;
+        }
+    }
+}
+
 bool AudioDeviceManager::isMidiInputEnabled (const String& name) const
 {
     for (auto& device : MidiInput::getAvailableDevices())
         if (device.name == name)
             return isMidiInputDeviceEnabled (device.identifier);
+
+    return false;
+}
+
+bool AudioDeviceManager::isMidiOutputEnabled (const String& name) const
+{
+    for (auto& device : MidiOutput::getAvailableDevices())
+        if (device.name == name)
+            return isMidiOutputDeviceEnabled (device.identifier);
 
     return false;
 }
