@@ -559,7 +559,7 @@ struct PluginTreeUtils
             auto isItemTicked = plugin.matchesIdentifierString (currentlyTickedPluginID);
             isTicked = isTicked || isItemTicked;
 
-            m.addItem (allPlugins.indexOf (plugin) + menuIdBase + indexOffset, name, !disabledPluginIDs.contains(plugin->fileOrIdentifier, true), isItemTicked);
+            m.addItem (getPluginMenuIndex(plugin) + menuIdBase + indexOffset, name, !disabledPluginIDs.contains(plugin.fileOrIdentifier, true), isItemTicked);
         }
 
         return isTicked;
@@ -618,12 +618,6 @@ bool KnownPluginList::CustomScanner::shouldExit() const noexcept
         return job->shouldExit();
 
     return false;
-}
-
-//==============================================================================
-void KnownPluginList::addToMenu (PopupMenu& menu, SortMethod sortMethod, const String& currentlyTickedPluginID) const
-{
-    addToMenu (menu, getTypes(), sortMethod, currentlyTickedPluginID);
 }
 
 int KnownPluginList::getIndexChosenByMenu (int menuResultCode) const
