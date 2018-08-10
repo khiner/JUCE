@@ -35,6 +35,11 @@ ArrowButton::ArrowButton (const String& name, float arrowDirectionInRadians, Col
 
 ArrowButton::~ArrowButton() {}
 
+void ArrowButton::setColour (const Colour& colour)
+{
+    this->colour = colour;
+}
+
 void ArrowButton::paintButton (Graphics& g, bool /*shouldDrawButtonAsHighlighted*/, bool shouldDrawButtonAsDown)
 {
     Path p (path);

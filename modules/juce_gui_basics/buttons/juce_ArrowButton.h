@@ -55,6 +55,7 @@ public:
     /** @internal */
     void paintButton (Graphics&, bool, bool) override;
 
+    void setColour(const Colour& colour);
 private:
     Colour colour;
     Path path;
