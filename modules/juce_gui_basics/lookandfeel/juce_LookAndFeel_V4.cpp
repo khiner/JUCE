@@ -1097,7 +1097,7 @@ void LookAndFeel_V4::drawRotarySlider (Graphics& g, int x, int y, int width, int
                                 arcRadius,
                                 arcRadius,
                                 0.0f,
-                                rotaryStartAngle,
+                                slider.getProperties().contains ("fromCentre") ? (rotaryStartAngle + rotaryEndAngle) / 2 : rotaryStartAngle,
                                 toAngle,
                                 true);
 
