@@ -519,7 +519,6 @@ struct PluginTreeUtils
 
     static bool addToMenu (const KnownPluginList::PluginTree& tree, PopupMenu& m,
                            const Array<PluginDescription>& allPlugins,
-                           const StringArray& disabledPluginIDs,
                            const String& currentlyTickedPluginID,
                            int indexOffset=0)
     {
@@ -528,7 +527,7 @@ struct PluginTreeUtils
         for (auto* sub : tree.subFolders)
         {
             PopupMenu subMenu;
-            auto isItemTicked = addToMenu (*sub, subMenu, allPlugins, disabledPluginIDs, currentlyTickedPluginID, indexOffset);
+            auto isItemTicked = addToMenu (*sub, subMenu, allPlugins, currentlyTickedPluginID, indexOffset);
             isTicked = isTicked || isItemTicked;
 
             m.addSubMenu (sub->folder, subMenu, true, nullptr, isItemTicked, 0);
@@ -559,7 +558,7 @@ struct PluginTreeUtils
             auto isItemTicked = plugin.matchesIdentifierString (currentlyTickedPluginID);
             isTicked = isTicked || isItemTicked;
 
-            m.addItem (getPluginMenuIndex(plugin) + menuIdBase + indexOffset, name, !disabledPluginIDs.contains(plugin.fileOrIdentifier, true), isItemTicked);
+            m.addItem (getPluginMenuIndex(plugin) + indexOffset, name, true, isItemTicked);
         }
 
         return isTicked;
@@ -593,11 +592,10 @@ std::unique_ptr<KnownPluginList::PluginTree> KnownPluginList::createTree (const 
 }
 
 //==============================================================================
-void KnownPluginList::addToMenu (PopupMenu& menu, const SortMethod sortMethod,
-                                 const StringArray disabledPluginIDs, const String& currentlyTickedPluginID, int indexOffset) const
+void KnownPluginList::addToMenu (PopupMenu& menu, const Array<PluginDescription>& types, const SortMethod sortMethod, const String& currentlyTickedPluginID, int indexOffset)
 {
-    auto tree = createTree(sortMethod);
-    PluginTreeUtils::addToMenu (*tree, menu, types, disabledPluginIDs, currentlyTickedPluginID, indexOffset);
+    auto tree = createTree(types, sortMethod);
+    PluginTreeUtils::addToMenu (*tree, menu, types, currentlyTickedPluginID, indexOffset);
 }
 
 int KnownPluginList::getIndexChosenByMenu (const Array<PluginDescription>& types, int menuResultCode)
@@ -618,6 +616,11 @@ bool KnownPluginList::CustomScanner::shouldExit() const noexcept
         return job->shouldExit();
 
     return false;
+}
+
+//==============================================================================
+void KnownPluginList::addToMenu (PopupMenu& menu, SortMethod sortMethod, const String& currentlyTickedPluginID, int indexOffset) const {
+    addToMenu(menu, getTypes(), sortMethod, currentlyTickedPluginID, indexOffset);
 }
 
 int KnownPluginList::getIndexChosenByMenu (int menuResultCode) const
