@@ -118,16 +118,16 @@ public:
         callListenersForAllParents (nullptr, [=, &tree] (Listener& l) { l.valueTreeChildOrderChanged (tree, oldIndex, newIndex); });
     }
 
-    void sendChildWillBeMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex)
+    void sendChildWillBeMovedToNewParent (ValueTree child, ValueTree& oldParent, int oldIndex, ValueTree& newParent, int newIndex)
     {
         ValueTree tree (this);
-        callListenersForAllParents (nullptr, [=, &tree] (Listener& l) { l.valueTreeChildWillBeMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
+        callListenersForAllParents (nullptr, [&] (Listener& l) { l.valueTreeChildWillBeMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
     }
 
-    void sendChildHasMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex)
+    void sendChildHasMovedToNewParent (ValueTree child, ValueTree& oldParent, int oldIndex, ValueTree& newParent, int newIndex)
     {
         ValueTree tree (this);
-        callListenersForAllParents (nullptr, [=, &tree] (Listener& l) { l.valueTreeChildHasMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
+        callListenersForAllParents (nullptr, [&] (Listener& l) { l.valueTreeChildHasMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
     }
 
     void sendParentChangeMessage()
@@ -355,8 +355,8 @@ public:
         }
         if (Ptr child = currentParentObject->children.getObjectPointer (currentIndex)) {
             if (undoManager == nullptr) {
-                const ValueTree &oldParent = ValueTree (currentParentObject);
-                const ValueTree &newParent = ValueTree (this);
+                ValueTree oldParent = ValueTree (currentParentObject);
+                ValueTree newParent = ValueTree (this);
                 sendChildWillBeMovedToNewParent(ValueTree (child), oldParent, currentIndex, newParent, insertIndex);
                 currentParentObject->removeChild(currentIndex, nullptr);
                 addChild(child, insertIndex, nullptr);

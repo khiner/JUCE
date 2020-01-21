@@ -522,9 +522,9 @@ public:
         virtual void valueTreeChildOrderChanged (ValueTree& parentTreeWhoseChildrenHaveMoved,
                                                  int oldIndex, int newIndex);
 
-        virtual void valueTreeChildWillBeMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex) {};
+        virtual void valueTreeChildWillBeMovedToNewParent (ValueTree child, ValueTree& oldParent, int oldIndex, ValueTree& newParent, int newIndex) {};
 
-        virtual void valueTreeChildHasMovedToNewParent (ValueTree child, const ValueTree& oldParent, int oldIndex, const ValueTree& newParent, int newIndex) {};
+        virtual void valueTreeChildHasMovedToNewParent (ValueTree child, ValueTree& oldParent, int oldIndex, ValueTree& newParent, int newIndex) {};
 
         /** This method is called when a tree has been added or removed from a parent.
 
