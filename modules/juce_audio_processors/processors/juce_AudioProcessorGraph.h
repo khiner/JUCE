@@ -64,6 +64,8 @@ public:
 
         uint32 uid = 0;
 
+        bool isValid() const noexcept { return uid != 0; }
+
         bool operator== (const NodeID& other) const noexcept    { return uid == other.uid; }
         bool operator!= (const NodeID& other) const noexcept    { return uid != other.uid; }
         bool operator<  (const NodeID& other) const noexcept    { return uid <  other.uid; }
