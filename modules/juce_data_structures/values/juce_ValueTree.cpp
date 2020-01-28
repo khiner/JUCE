@@ -118,18 +118,6 @@ public:
         callListenersForAllParents (nullptr, [=, &tree] (Listener& l) { l.valueTreeChildOrderChanged (tree, oldIndex, newIndex); });
     }
 
-    void sendChildWillBeMovedToNewParent (ValueTree child, ValueTree& oldParent, int oldIndex, ValueTree& newParent, int newIndex)
-    {
-        ValueTree tree (this);
-        callListenersForAllParents (nullptr, [&] (Listener& l) { l.valueTreeChildWillBeMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
-    }
-
-    void sendChildHasMovedToNewParent (ValueTree child, ValueTree& oldParent, int oldIndex, ValueTree& newParent, int newIndex)
-    {
-        ValueTree tree (this);
-        callListenersForAllParents (nullptr, [&] (Listener& l) { l.valueTreeChildHasMovedToNewParent (child, oldParent, oldIndex, newParent, newIndex); });
-    }
-
     void sendParentChangeMessage()
     {
         ValueTree tree (*this);
@@ -355,12 +343,8 @@ public:
         }
         if (Ptr child = currentParentObject->children.getObjectPointer (currentIndex)) {
             if (undoManager == nullptr) {
-                ValueTree oldParent = ValueTree (currentParentObject);
-                ValueTree newParent = ValueTree (this);
-                sendChildWillBeMovedToNewParent(ValueTree (child), oldParent, currentIndex, newParent, insertIndex);
                 currentParentObject->removeChild(currentIndex, nullptr);
                 addChild(child, insertIndex, nullptr);
-                sendChildHasMovedToNewParent(ValueTree (child), oldParent, currentIndex, newParent, insertIndex);
             } else {
                 undoManager->perform(new MoveChildToNewParentAction(currentParentObject, currentIndex, this, insertIndex));
             }
